@@ -1,48 +1,48 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import uuid
-from fastapi.middleware.cors import CORSMiddleware
-import os
-import stripe
-from pydantic import BaseModel
-import requests
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    import uuid
+    from fastapi.middleware.cors import CORSMiddleware
+    import os
+    import stripe
+    from pydantic import BaseModel
+    import requests
 
-app = FastAPI()
-app.add_middleware(
+    app = FastAPI()
+    app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+    )
 
-paid_reports = {}
+    paid_reports = {}
 
-class CreateReportRequest(BaseModel):
+    class CreateReportRequest(BaseModel):
     email: str | None = None
-class CheckoutRequest(BaseModel):
+    class CheckoutRequest(BaseModel):
     report_id: str
 
-@app.get("/")
-def root():
+    @app.get("/")
+    def root():
     return {"message": "Kryos backend is live"}
 
-@app.get("/health")
-def health():
+    @app.get("/health")
+    def health():
     return {"ok": True}
 
-@app.post("/reports/create")
-def create_report(req: CreateReportRequest):
+    @app.post("/reports/create")
+    def create_report(req: CreateReportRequest):
     report_id = str(uuid.uuid4())
     paid_reports[report_id] = False
     return {"report_id": report_id, "paid": False}
 
-@app.get("/reports/{report_id}")
-def get_report(report_id: str):
+    @app.get("/reports/{report_id}")
+    def get_report(report_id: str):
     paid = paid_reports.get(report_id, False)
     return {"report_id": report_id, "paid": paid}
-@app.post("/checkout")
-def create_checkout(req: CheckoutRequest):
+    @app.post("/checkout")
+    def create_checkout(req: CheckoutRequest):
     stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
     session = stripe.checkout.Session.create(
@@ -68,20 +68,18 @@ def create_checkout(req: CheckoutRequest):
 
     return {"url": session.url}
 
-@app.post("/reports/{report_id}/mark-paid")
-def mark_paid(report_id: str):
+    @app.post("/reports/{report_id}/mark-paid")
+    def mark_paid(report_id: str):
     paid_reports[report_id] = True
     return {"report_id": report_id, "paid": True}
-
- @app.post("/analyze-token")
-def analyze_token(data: dict):
+    @app.post("/analyze-token")
+    def analyze_token(data: dict):
     token = data.get("token")
 
     if not token:
         return {"error": "No token provided"}
 
-    # DEX Screener API
-    url = f"https://api.dexscreener.com/latest/dex/search/?q={token}"
+     url = f"https://api.dexscreener.com/latest/dex/search/?q={token}"
     res = requests.get(url).json()
 
     if not res.get("pairs"):
@@ -94,30 +92,25 @@ def analyze_token(data: dict):
     volume = float(pair.get("volume", {}).get("h24", 0))
     fdv = float(pair.get("fdv", 0))
 
-    # --- SIMPLE SCORING ---
-    score = 100
+     score = 100
 
-    if liquidity < 100000:
+     if liquidity < 100000:
         score -= 20
-
-    if volume < 50000:
+     if volume < 50000:
         score -= 20
-
-    if fdv > 100000000:
+     if fdv > 100000000:
         score -= 20
-
-    if price < 0.01:
+     if price < 0.01:
         score -= 10
 
-    # Risk label
-    if score > 75:
+     if score > 75:
         risk = "Low"
-    elif score > 50:
+     elif score > 50:
         risk = "Medium"
-    else:
+     else:
         risk = "High"
 
-    return {
+     return {
         "score": score,
         "risk": risk,
         "price": price,
@@ -125,4 +118,5 @@ def analyze_token(data: dict):
         "volume_24h": volume,
         "fdv": fdv,
         "token": token,
-    } 
+    }
+
