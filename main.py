@@ -106,9 +106,9 @@ def analyze_token(data: dict):
     search_query = token
 
     if token.lower() == "sol":
-    search_query = "solana"
+        search_query = "solana"
     elif token.lower() == "eth":
-    search_query = "ethereum"
+        search_query = "ethereum"
     elif token.lower() == "btc":
     search_query = "bitcoin"
 
