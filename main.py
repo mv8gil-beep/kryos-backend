@@ -79,7 +79,7 @@
     if not token:
         return {"error": "No token provided"}
 
-     url = f"https://api.dexscreener.com/latest/dex/search/?q={token}"
+    url = f"https://api.dexscreener.com/latest/dex/search/?q={token}"
     res = requests.get(url).json()
 
     if not res.get("pairs"):
@@ -92,25 +92,25 @@
     volume = float(pair.get("volume", {}).get("h24", 0))
     fdv = float(pair.get("fdv", 0))
 
-     score = 100
+    score = 100
 
-     if liquidity < 100000:
+    if liquidity < 100000:
         score -= 20
-     if volume < 50000:
+    if volume < 50000:
         score -= 20
-     if fdv > 100000000:
+    if fdv > 100000000:
         score -= 20
-     if price < 0.01:
+    if price < 0.01:
         score -= 10
 
-     if score > 75:
+    if score > 75:
         risk = "Low"
-     elif score > 50:
+    elif score > 50:
         risk = "Medium"
-     else:
+    else:
         risk = "High"
 
-     return {
+    return {
         "score": score,
         "risk": risk,
         "price": price,
@@ -119,4 +119,3 @@
         "fdv": fdv,
         "token": token,
     }
-
