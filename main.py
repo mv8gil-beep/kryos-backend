@@ -103,14 +103,15 @@ def analyze_token(data: dict):
     if not token:
         return {"error": "No token provided"}
 
+    token_lower = token.lower()
     search_query = token
 
-    if token.lower() == "sol":
+    if token_lower == "sol":
         search_query = "solana"
-    elif token.lower() == "eth":
+    elif token_lower == "eth":
         search_query = "ethereum"
-    elif token.lower() == "btc":
-    search_query = "bitcoin"
+    elif token_lower == "btc":
+        search_query = "bitcoin"
 
     url = f"https://api.dexscreener.com/latest/dex/search/?q={search_query}"
     res = requests.get(url).json()
@@ -118,17 +119,15 @@ def analyze_token(data: dict):
     if not res.get("pairs"):
         return {"error": "Token not found"}
 
-    token_lower = token.lower()
-
     matching_pairs = [
-    p for p in res["pairs"]
-    if p.get("baseToken", {}).get("symbol", "").lower() == token_lower
+        p for p in res["pairs"]
+        if p.get("baseToken", {}).get("symbol", "").lower() == token_lower
     ]
 
-if matching_pairs:
-    pair = matching_pairs[0]
-else:
-    pair = res["pairs"][0]
+    if matching_pairs:
+        pair = matching_pairs[0]
+    else:
+        pair = res["pairs"][0]
 
     price = float(pair.get("priceUsd", 0))
     liquidity = float(pair.get("liquidity", {}).get("usd", 0))
