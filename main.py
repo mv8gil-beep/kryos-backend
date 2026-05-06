@@ -103,7 +103,16 @@ def analyze_token(data: dict):
     if not token:
         return {"error": "No token provided"}
 
-    url = f"https://api.dexscreener.com/latest/dex/search/?q={token}"
+    search_query = token
+
+    if token.lower() == "sol":
+    search_query = "solana"
+    elif token.lower() == "eth":
+    search_query = "ethereum"
+    elif token.lower() == "btc":
+    search_query = "bitcoin"
+
+    url = f"https://api.dexscreener.com/latest/dex/search/?q={search_query}"
     res = requests.get(url).json()
 
     if not res.get("pairs"):
