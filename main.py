@@ -99,21 +99,67 @@ def create_checkout(req: CheckoutRequest):
 @app.post("/analyze-token")
 def analyze_token(data: dict):
     token = data.get("token")
+    chain = data.get("chain", "solana")
 
     if not token:
         return {"error": "No token provided"}
 
+    url = f"https://api.dexscreener.com/token-pairs/v1/{chain}/{token}"
+    res = requests.get(url).json()
+
+    if not isinstance(res, list) or len(res) == 0:
+        return {"error": "Token not found"}
+
+    # Pick pair with highest liquidity
+    pair = max(
+        res,
+        key=lambda p: float(p.get("liquidity", {}).get("usd", 0) or 0),
+    )
+
+    price = float(pair.get("priceUsd", 0) or 0)
+    liquidity = float(pair.get("liquidity", {}).get("usd", 0) or 0)
+    volume = float(pair.get("volume", {}).get("h24", 0) or 0)
+    fdv = float(pair.get("fdv", 0) or 0)
+
+    score = 100
+
+    if liquidity < 100000:
+        score -= 25
+    if volume < 50000:
+        score -= 20
+    if fdv > 100000000:
+        score -= 15
+    if price <= 0:
+        score -= 20
+
+    if score > 75:
+        risk = "Low"
+    elif score > 50:
+        risk = "Medium"
+    else:
+        risk = "High"
+
+    return {
+        "score": score,
+        "risk": risk,
+        "price": price,
+        "liquidity": liquidity,
+        "volume_24h": volume,
+        "fdv": fdv,
+        "token": token,
+        "chain": chain,
+        "pair_address": pair.get("pairAddress"),
+        "dex": pair.get("dexId"),
+        "base_symbol": pair.get("baseToken", {}).get("symbol"),
+        "base_name": pair.get("baseToken", {}).get("name"),
+    }
     token_lower = token.lower()
     search_query = token
 
-    if token_lower == "sol":
-        search_query = "solana"
-    elif token_lower == "eth":
-        search_query = "ethereum"
-    elif token_lower == "btc":
-        search_query = "bitcoin"
+    chain = data.get("chain", "solana")
+    token = data.get("token")
 
-    url = f"https://api.dexscreener.com/latest/dex/search/?q={search_query}"
+    url = f"https://api.dexscreener.com/token-pairs/v1/{chain}/{token}"
     res = requests.get(url).json()
 
     if not res.get("pairs"):
