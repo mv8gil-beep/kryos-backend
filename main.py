@@ -109,6 +109,16 @@ def analyze_token(data: dict):
     if not res.get("pairs"):
         return {"error": "Token not found"}
 
+    token_lower = token.lower()
+
+    matching_pairs = [
+    p for p in res["pairs"]
+    if p.get("baseToken", {}).get("symbol", "").lower() == token_lower
+    ]
+
+if matching_pairs:
+    pair = matching_pairs[0]
+else:
     pair = res["pairs"][0]
 
     price = float(pair.get("priceUsd", 0))
