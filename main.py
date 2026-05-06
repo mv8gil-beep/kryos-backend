@@ -1,11 +1,11 @@
-    from fastapi import FastAPI
-    from pydantic import BaseModel
-    import uuid
-    from fastapi.middleware.cors import CORSMiddleware
-    import os
-    import stripe
-    from pydantic import BaseModel
-    import requests
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uuid
+from fastapi.middleware.cors import CORSMiddleware
+import os
+import stripe
+from pydantic import BaseModel
+import requests
 
     app = FastAPI()
     app.add_middleware(
