@@ -5,6 +5,7 @@ import os
 import stripe
 from pydantic import BaseModel
 import uuid
+from typing import List
 
 app = FastAPI()
 
@@ -27,6 +28,24 @@ class CreateReportRequest(BaseModel):
 
 class CheckoutRequest(BaseModel):
     report_id: str
+
+class UnlockSchedule(BaseModel):
+    category: str
+    allocation_pct: float
+    tge_pct: float
+    cliff_months: int
+    duration_months: int
+
+class LaunchAnalysisRequest(BaseModel):
+    total_supply: float
+    circulating_supply: float
+    fdv: float
+    liquidity: float
+    tge_pct: float
+    volume_24h: float
+    avg_daily_volume: float
+    unlock_schedules: List[UnlockSchedule]
+
 
 
 # ---------- ROUTES ----------
@@ -153,57 +172,89 @@ def analyze_token(data: dict):
         "base_symbol": pair.get("baseToken", {}).get("symbol"),
         "base_name": pair.get("baseToken", {}).get("name"),
     }
-    token_lower = token.lower()
-    search_query = token
 
-    chain = data.get("chain", "solana")
-    token = data.get("token")
-
-    url = f"https://api.dexscreener.com/token-pairs/v1/{chain}/{token}"
-    res = requests.get(url).json()
-
-    if not res.get("pairs"):
-        return {"error": "Token not found"}
-
-    matching_pairs = [
-        p for p in res["pairs"]
-        if p.get("baseToken", {}).get("symbol", "").lower() == token_lower
-    ]
-
-    if matching_pairs:
-        pair = matching_pairs[0]
-    else:
-        pair = res["pairs"][0]
-
-    price = float(pair.get("priceUsd", 0))
-    liquidity = float(pair.get("liquidity", {}).get("usd", 0))
-    volume = float(pair.get("volume", {}).get("h24", 0))
-    fdv = float(pair.get("fdv", 0))
+@app.post("/analyze-launch")
+def analyze_launch(data: LaunchAnalysisRequest):
 
     score = 100
+    warnings = []
+    recommendations = []
 
-    if liquidity < 100000:
+    circulating_pct = (
+        data.circulating_supply / data.total_supply * 100
+        if data.total_supply > 0 else 0
+    )
+
+    fdv_liquidity_ratio = (
+        data.fdv / data.liquidity
+        if data.liquidity > 0 else 999999
+    )
+
+    # TGE penalty
+    if data.tge_pct > 20:
+        score -= 25
+        warnings.append("High TGE unlock")
+        recommendations.append("Reduce TGE below 15%")
+
+    elif data.tge_pct > 12:
+        score -= 10
+        warnings.append("Moderate TGE unlock")
+
+    # Liquidity penalty
+    if fdv_liquidity_ratio > 30:
         score -= 20
-    if volume < 50000:
-        score -= 20
-    if fdv > 100000000:
-        score -= 20
-    if price < 0.01:
+        warnings.append("Very thin liquidity")
+        recommendations.append("Increase liquidity depth")
+
+    elif fdv_liquidity_ratio > 15:
         score -= 10
 
-    if score > 75:
-        risk = "Low"
-    elif score > 50:
+    # Circulating supply penalty
+    if circulating_pct < 10:
+        score -= 15
+        warnings.append("Very low circulating supply")
+
+    # Volume support penalty
+    if data.volume_24h < data.liquidity * 0.25:
+        score -= 10
+        warnings.append("Weak trading activity")
+
+    # Unlock analysis
+    for unlock in data.unlock_schedules:
+
+        if unlock.duration_months < 12:
+            score -= 5
+            recommendations.append(
+                f"Extend {unlock.category} vesting duration"
+            )
+
+        if unlock.tge_pct > 10:
+            score -= 5
+            warnings.append(
+                f"{unlock.category} unlock too aggressive"
+            )
+
+    score = max(score, 1)
+
+    risk = "Low"
+
+    if score < 75:
         risk = "Medium"
-    else:
+
+    if score < 50:
         risk = "High"
 
     return {
         "score": score,
         "risk": risk,
-        "price": price,
-        "liquidity": liquidity,
-        "volume_24h": volume,
-        "fdv": fdv,
-        "token": token,
+        "summary": "Launch structure analysis completed.",
+        "metrics": {
+            "circulating_pct": round(circulating_pct, 2),
+            "fdv_liquidity_ratio": round(fdv_liquidity_ratio, 2),
+            "tge_pct": data.tge_pct,
+            "liquidity": data.liquidity
+        },
+        "warnings": warnings,
+        "recommendations": recommendations
     }
+    
