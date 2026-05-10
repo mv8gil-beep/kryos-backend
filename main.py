@@ -108,8 +108,8 @@ def create_checkout(req: CheckoutRequest):
         ],
         client_reference_id=req.report_id,
         metadata={"report_id": req.report_id},
-        success_url=f"http://localhost:5173/success?report_id={req.report_id}",
-        cancel_url="http://localhost:5173",
+        success_url=f"https://kryos.io/success?report_id={req.report_id}",
+        cancel_url="https://kryos.io",
     )
 
     return {"url": session.url}
