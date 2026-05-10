@@ -25,6 +25,7 @@ reports = {}
 class CreateReportRequest(BaseModel):
     email: str | None = None
     token: str | None = None
+    chain: str | None = "solana"
 
 class CheckoutRequest(BaseModel):
     report_id: str
@@ -54,9 +55,10 @@ class LaunchAnalysisRequest(BaseModel):
 def create_report(req: CreateReportRequest):
     report_id = str(uuid.uuid4())
 
-    reports[report_id] = {
-        "paid": False,
-        "token": req.token or "unknown"
+   reports[report_id] = {
+    "paid": False,
+    "token": req.token or "unknown",
+    "chain": req.chain or "solana",
     }
 
     return {
@@ -73,9 +75,10 @@ def get_report(report_id: str):
         return {"error": "Not found"}
 
     return {
-        "report_id": report_id,
-        "paid": report["paid"],
-        "token": report["token"]
+    "report_id": report_id,
+    "paid": report["paid"],
+    "token": report["token"],
+    "chain": report.get("chain", "solana"),
     }
 
 
