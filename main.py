@@ -55,10 +55,10 @@ class LaunchAnalysisRequest(BaseModel):
 def create_report(req: CreateReportRequest):
     report_id = str(uuid.uuid4())
 
-   reports[report_id] = {
-    "paid": False,
-    "token": req.token or "unknown",
-    "chain": req.chain or "solana",
+    reports[report_id] = {
+        "paid": False,
+        "token": req.token or "unknown",
+        "chain": req.chain or "solana",
     }
 
     return {
