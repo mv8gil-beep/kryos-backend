@@ -5,7 +5,7 @@ import os
 import stripe
 from pydantic import BaseModel
 import uuid
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -23,9 +23,10 @@ reports = {}
 
 # ---------- MODELS ----------
 class CreateReportRequest(BaseModel):
-    email: str | None = None
-    token: str | None = None
-    chain: str | None = "solana"
+    email: Optional[str] = None
+    token: Optional[str] = None
+    chain: Optional[str] = "solana"
+   
 
 class CheckoutRequest(BaseModel):
     report_id: str
@@ -93,6 +94,7 @@ def mark_paid(report_id: str):
 @app.post("/checkout")
 def create_checkout(req: CheckoutRequest):
     stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+    print("STRIPE KEY MODE:", stripe.api_key[:7] if stripe.api_key else "MISSING")
 
     session = stripe.checkout.Session.create(
         mode="payment",
@@ -193,58 +195,97 @@ def analyze_launch(data: LaunchAnalysisRequest):
         if data.liquidity > 0 else 999999
     )
 
-    # TGE penalty
-    if data.tge_pct > 20:
-        score -= 25
-        warnings.append("High TGE unlock")
-        recommendations.append("Reduce TGE below 15%")
+    # TGE penalty — early unlock risk
+    if data.tge_pct >= 40:
+        score -= 30
+        warnings.append("Aggressive TGE unlock")
+        recommendations.append("Reduce TGE closer to 10–15%")
 
-    elif data.tge_pct > 12:
+    elif data.tge_pct >= 25:
+        score -= 22
+        warnings.append("High TGE unlock")
+
+    elif data.tge_pct >= 15:
         score -= 10
         warnings.append("Moderate TGE unlock")
 
-    # Liquidity penalty
-    if fdv_liquidity_ratio > 30:
-        score -= 20
-        warnings.append("Very thin liquidity")
-        recommendations.append("Increase liquidity depth")
+    # FDV / liquidity penalty — market depth risk
+    if fdv_liquidity_ratio >= 100:
+        score -= 35
+        warnings.append("Extreme FDV/liquidity stress")
+        recommendations.append("Increase liquidity before launch")
 
-    elif fdv_liquidity_ratio > 15:
-        score -= 10
+    elif fdv_liquidity_ratio >= 50:
+        score -= 28
+        warnings.append("Very high FDV/liquidity ratio")
 
-    # Circulating supply penalty
-    if circulating_pct < 10:
-        score -= 15
+    elif fdv_liquidity_ratio >= 25:
+        score -= 18
+        warnings.append("Elevated liquidity stress")
+
+    elif fdv_liquidity_ratio >= 12:
+        score -= 8
+
+    # Circulating supply penalty — low float risk
+    if circulating_pct < 5:
+        score -= 30
+        warnings.append("Extremely low circulating supply")
+        recommendations.append(
+            "Increase initial circulating float or reduce FDV"
+        )
+
+    elif circulating_pct < 10:
+        score -= 22
         warnings.append("Very low circulating supply")
 
-    # Volume support penalty
-    if data.volume_24h < data.liquidity * 0.25:
+    elif circulating_pct < 20:
         score -= 10
+        warnings.append("Low circulating float")
+
+    # Volume support penalty
+    volume_liquidity_ratio = (
+        data.volume_24h / data.liquidity
+        if data.liquidity > 0 else 0
+    )
+
+    if volume_liquidity_ratio < 0.05:
+        score -= 20
+        warnings.append("Very weak trading activity versus liquidity")
+
+    elif volume_liquidity_ratio < 0.15:
+        score -= 12
         warnings.append("Weak trading activity")
 
-    # Unlock analysis
+    elif volume_liquidity_ratio < 0.30:
+        score -= 6
+
+    # Unlock schedule penalty
     for unlock in data.unlock_schedules:
 
         if unlock.duration_months < 12:
-            score -= 5
+            score -= 8
             recommendations.append(
                 f"Extend {unlock.category} vesting duration"
             )
 
-        if unlock.tge_pct > 10:
-            score -= 5
+        if unlock.tge_pct > 15:
+            score -= 10
             warnings.append(
                 f"{unlock.category} unlock too aggressive"
             )
 
-    score = max(score, 1)
+        elif unlock.tge_pct > 8:
+            score -= 5
 
-    risk = "Low"
+    score = max(min(score, 100), 1)
 
-    if score < 75:
+    if score >= 80:
+        risk = "Low"
+
+    elif score >= 60:
         risk = "Medium"
 
-    if score < 50:
+    else:
         risk = "High"
 
     return {
@@ -260,4 +301,3 @@ def analyze_launch(data: LaunchAnalysisRequest):
         "warnings": warnings,
         "recommendations": recommendations
     }
-    
