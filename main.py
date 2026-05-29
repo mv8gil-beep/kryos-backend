@@ -220,7 +220,7 @@ def analyze_launch(data: LaunchAnalysisRequest):
         warnings.append("Very high FDV/liquidity ratio")
 
     elif fdv_liquidity_ratio >= 25:
-        score -= 18
+        score -= 14
         warnings.append("Elevated liquidity stress")
 
     elif fdv_liquidity_ratio >= 12:
@@ -239,7 +239,7 @@ def analyze_launch(data: LaunchAnalysisRequest):
         warnings.append("Very low circulating supply")
 
     elif circulating_pct < 20:
-        score -= 10
+        score -= 6
         warnings.append("Low circulating float")
 
     # Volume support penalty
@@ -258,6 +258,19 @@ def analyze_launch(data: LaunchAnalysisRequest):
 
     elif volume_liquidity_ratio < 0.30:
         score -= 6
+    
+        # Positive quality signals — reward healthy launch structure
+    if circulating_pct >= 25:
+        score += 6
+
+    if fdv_liquidity_ratio <= 10:
+        score += 6
+
+    if data.tge_pct <= 12:
+        score += 5
+
+    if volume_liquidity_ratio >= 0.50:
+        score += 5
 
     # Unlock schedule penalty
     for unlock in data.unlock_schedules:
@@ -282,16 +295,73 @@ def analyze_launch(data: LaunchAnalysisRequest):
     if score >= 80:
         risk = "Low"
 
-    elif score >= 60:
+    elif score >= 45:
         risk = "Medium"
 
     else:
         risk = "High"
 
+    strengths = []
+    weaknesses = []
+
+    if circulating_pct >= 25:
+        strengths.append("Healthy circulating supply at launch")
+    elif circulating_pct < 10:
+        weaknesses.append("Very low circulating supply")
+
+    if fdv_liquidity_ratio <= 10:
+        strengths.append("Strong liquidity relative to valuation")
+    elif fdv_liquidity_ratio >= 25:
+        weaknesses.append("High FDV relative to liquidity")
+
+    if data.tge_pct <= 12:
+        strengths.append("Disciplined TGE structure")
+    elif data.tge_pct >= 25:
+        weaknesses.append("Aggressive TGE unlock")
+
+    if score >= 80:
+        investor_summary = (
+            "Launch structure appears strong with healthy liquidity, "
+            "reasonable token distribution, and manageable unlock risk."
+        )
+
+        would_invest = (
+            "Yes. Based on current launch metrics, this launch appears "
+            "well structured and investable."
+        )
+
+    elif score >= 45:
+        investor_summary = (
+            "Launch has both strengths and weaknesses. Investors should "
+            "monitor dilution risk, liquidity depth, and unlock schedules."
+        )
+
+        would_invest = (
+            "Possibly. The opportunity may be attractive, but additional "
+            "due diligence is recommended."
+        )
+
+    else:
+        investor_summary = (
+            "Launch structure presents elevated risk due to liquidity, "
+            "distribution, or unlock concerns."
+        )
+
+        would_invest = (
+            "No. Current launch conditions appear too risky without "
+            "meaningful improvements."
+        )
+
     return {
         "score": score,
         "risk": risk,
         "summary": "Launch structure analysis completed.",
+
+        "investor_summary": investor_summary,
+        "would_invest": would_invest,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+
         "metrics": {
             "circulating_pct": round(circulating_pct, 2),
             "fdv_liquidity_ratio": round(fdv_liquidity_ratio, 2),
