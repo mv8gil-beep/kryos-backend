@@ -351,6 +351,39 @@ def analyze_launch(data: LaunchAnalysisRequest):
             "No. Current launch conditions appear too risky without "
             "meaningful improvements."
         )
+    remaining_supply = max(
+        data.total_supply - data.circulating_supply,
+        0
+    )
+
+    dilution_pct = (
+        ((data.total_supply - data.circulating_supply)
+        / data.circulating_supply) * 100
+        if data.circulating_supply > 0
+        else 0
+    )
+
+    if dilution_pct < 50:
+        dilution_risk = "Low"
+    elif dilution_pct < 200:
+        dilution_risk = "Medium"
+    else:
+        dilution_risk = "High"
+
+        unlock_timeline = []
+
+    unlock_timeline.append({
+        "month": 0,
+        "event": "Token Generation Event (TGE)",
+        "unlock_pct": data.tge_pct
+    })
+
+    for unlock in data.unlock_schedules:
+        unlock_timeline.append({
+            "month": unlock.duration_months,
+            "event": unlock.category,
+            "unlock_pct": unlock.tge_pct
+        })
 
     return {
         "score": score,
@@ -361,6 +394,15 @@ def analyze_launch(data: LaunchAnalysisRequest):
         "would_invest": would_invest,
         "strengths": strengths,
         "weaknesses": weaknesses,
+                "dilution_forecast": {
+            "current_circulating": data.circulating_supply,
+            "fully_diluted_supply": data.total_supply,
+            "remaining_supply": remaining_supply,
+            "dilution_pct": round(dilution_pct, 1),
+            "risk": dilution_risk,
+        },
+
+            "unlock_timeline": unlock_timeline,
 
         "metrics": {
             "circulating_pct": round(circulating_pct, 2),
