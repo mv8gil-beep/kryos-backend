@@ -106,7 +106,7 @@ def create_checkout(req: CheckoutRequest):
                     "product_data": {
                         "name": "Kryos Full Risk Report",
                     },
-                    "unit_amount": 2900,
+                    "unit_amount": 999,
                 },
                 "quantity": 1,
             }
